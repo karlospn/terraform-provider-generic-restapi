@@ -4,12 +4,16 @@ import (
 	"os"
 	"testing"
 
-	"github.com/hashicorp/terraform/helper/resource"
+	"github.com/hashicorp/terraform-plugin-sdk/helper/resource"
 )
 
-func TestAccRestApiObject_Basic(t *testing.T) {
+func TestAccScaffoldingObject_Basic(t *testing.T) {
 
 	os.Setenv("REST_API_URI", "http://127.0.0.1:5000")
+	os.Setenv("REST_API_READ_METHOD", "/api/builds/projectA/{id}")
+	os.Setenv("REST_API_CREATE_METHOD", "/api/builds/projectA")
+	os.Setenv("REST_API_UPDATE_METHOD", "/api/builds/projectA/{id}")
+	os.Setenv("REST_API_DESTROY_METHOD", "/api/builds/projectA/{id}")
 
 	resource.UnitTest(t, resource.TestCase{
 		Providers: testAccProviders,

@@ -1,20 +1,20 @@
 package generic
 
 import (
+	"os"
 	"testing"
 
-	"github.com/hashicorp/terraform/config"
-	"github.com/hashicorp/terraform/helper/schema"
-	"github.com/hashicorp/terraform/terraform"
+	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/terraform"
 )
 
-var testAccProvider terraform.ResourceProvider
 var testAccProviders map[string]terraform.ResourceProvider
+var testAccProvider *schema.Provider
 
 func init() {
-	testAccProvider = Provider().(terraform.ResourceProvider)
+	testAccProvider = Provider().(*schema.Provider)
 	testAccProviders = map[string]terraform.ResourceProvider{
-		"sccafolding_resource": testAccProvider,
+		"scaffolding": testAccProvider,
 	}
 }
 
@@ -28,18 +28,8 @@ func TestProvider_impl(t *testing.T) {
 	var _ terraform.ResourceProvider = Provider()
 }
 
-func TestResourceProvider_RequireBasic(t *testing.T) {
-	rp := Provider()
-
-	raw := map[string]interface{}{}
-
-	rawConfig, err := config.NewRawConfig(raw)
-	if err != nil {
-		t.Fatalf("err: %s", err)
-	}
-
-	err = rp.Configure(terraform.NewResourceConfig(rawConfig))
-	if err != nil {
-		t.Fatalf("Provider failed with error: %s", err)
+func testAccPreCheck(t *testing.T) {
+	if v := os.Getenv("GITLAB_TOKEN"); v == "" {
+		t.Fatal("GITLAB_TOKEN must be set for acceptance tests")
 	}
 }
