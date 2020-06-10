@@ -1,2 +1,4 @@
-# terraform-provider-generic-restapi
-A terraform provider to manage a JSON objects using and external API
+These provider is based on:
+https://github.com/Mastercard/terraform-provider-restapi
+
+But it's a simplified version.
