@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/helper/structure"
 	"github.com/tidwall/gjson"
 )
 
@@ -55,6 +56,8 @@ func resourceScaffoldingCreate(d *schema.ResourceData, meta interface{}) error {
 		return fmt.Errorf("Failed to create record: %s", err)
 	}
 
+	log.Printf("resource create called. Object build:\n%s\n", data)
+
 	d.SetId(requestID.String())
 	return resourceScaffoldingRead(d, meta)
 }
@@ -66,11 +69,24 @@ func resourceScaffoldingRead(d *schema.ResourceData, meta interface{}) error {
 	result, err := send(client, "GET", strings.Replace(client.read_method, "{id}", id, -1), "")
 
 	if err != nil {
-		d.SetId("")
-		return nil
+
+		if strings.Contains(err.Error(), "not found") {
+			log.Printf("resource read called. No id found:\n%s\n", id)
+			d.SetId("")
+			return nil
+		}
+
+		return fmt.Errorf(
+			"There was a problem when trying to find object with ID: %s",
+			d.Id())
 	}
 
-	d.Set("data", result)
+	log.Printf("resource read called. Object built:\n%s\n", result)
+
+	norm, _ := structure.NormalizeJsonString(result)
+
+	d.Set("data", norm)
+
 	return nil
 }
 
@@ -79,19 +95,22 @@ func resourceScaffoldingUpdate(d *schema.ResourceData, meta interface{}) error {
 	id := d.Get("id_attribute").(string)
 	data := d.Get("data").(string)
 	client := meta.(*api_client)
-
 	requestID := gjson.Get(data, id)
 
 	if requestID.String() == "" {
 		return fmt.Errorf(" id not found on response")
 	}
 
+	log.Printf("resource updated called. Object built:\n%s\n", data)
+
 	b, _ := json.Marshal(json.RawMessage(data))
-	_, err := send(client, "PUT", strings.Replace(client.create_method, "{id}", requestID.String(), -1), string(b))
+
+	_, err := send(client, "PUT", strings.Replace(client.update_method, "{id}", requestID.String(), -1), string(b))
 
 	if err != nil {
 		return fmt.Errorf("Failed to update record: %s", err)
 	}
+
 	return resourceScaffoldingRead(d, meta)
 }
 
@@ -99,7 +118,7 @@ func resourceScaffoldingDelete(d *schema.ResourceData, meta interface{}) error {
 
 	id := d.Id()
 	client := meta.(*api_client)
-	_, err := send(client, "DELETE", strings.Replace(client.read_method, "{id}", id, -1), "")
+	_, err := send(client, "DELETE", strings.Replace(client.destroy_method, "{id}", id, -1), "")
 
 	if err != nil {
 		return err

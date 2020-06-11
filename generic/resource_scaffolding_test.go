@@ -24,6 +24,7 @@ func TestAccScaffoldingObject_Basic(t *testing.T) {
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr("scaffolding_resource.test", "id", "some_more_apps"),
 				),
+				ExpectNonEmptyPlan: true,
 			},
 			{
 				Config: testResourceUpdate,
@@ -51,14 +52,14 @@ resource "scaffolding_resource" "test" {
 
 const testResourceUpdate = `
 resource "scaffolding_resource" "test" {
-  id_attribute = "applicationName"
-  data = jsonencode(
-    {
-		"project": "projectA",
-        "applicationName" : "some_more_apps",
-        "buildTemplate": "template_12",
-        "pool": "MyPool",
-        "repository" : "App1",
-        "branch" : "master"
-    })
-}`
+	id_attribute = "applicationName"
+	data = jsonencode(
+	  {
+		  "project": "projectA",
+		  "applicationName" : "some_more_apps",
+		  "buildTemplate": "template_111",
+		  "pool": "MyPool",
+		  "repository" : "App1",
+		  "branch" : "master"
+	  })
+  }`
