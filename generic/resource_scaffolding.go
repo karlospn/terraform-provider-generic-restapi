@@ -39,37 +39,35 @@ func resourceScaffoldingCreate(d *schema.ResourceData, meta interface{}) error {
 
 	id := d.Get("id_attribute").(string)
 	data := d.Get("data").(string)
+
 	client := meta.(*api_client)
 
-	b, _ := json.Marshal(data)
-	result, err := send(client, "POST", strings.Replace(client.create_method, "{id}", id, -1), string(b))
+	requestID := gjson.Get(data, id)
+
+	if requestID.String() == "" {
+		return fmt.Errorf(" id not found on response")
+	}
+
+	b, _ := json.Marshal(json.RawMessage(data))
+	_, err := send(client, "POST", strings.Replace(client.create_method, "{id}", requestID.String(), -1), string(b))
 
 	if err != nil {
 		return fmt.Errorf("Failed to create record: %s", err)
 	}
 
-	key := gjson.Get(result, id)
-
-	if key.String() == "" {
-		return fmt.Errorf(" id not found on response")
-	}
-
-	d.SetId(key.String())
+	d.SetId(requestID.String())
 	return resourceScaffoldingRead(d, meta)
 }
 
 func resourceScaffoldingRead(d *schema.ResourceData, meta interface{}) error {
 
-	id := d.Get("id_attribute").(string)
+	id := d.Id()
 	client := meta.(*api_client)
 	result, err := send(client, "GET", strings.Replace(client.read_method, "{id}", id, -1), "")
 
 	if err != nil {
-		if strings.Contains(err.Error(), "Unable to find") {
-			d.SetId("")
-			return nil
-		}
-		return fmt.Errorf("Couldn't find record: %s", err)
+		d.SetId("")
+		return nil
 	}
 
 	d.Set("data", result)
@@ -82,14 +80,14 @@ func resourceScaffoldingUpdate(d *schema.ResourceData, meta interface{}) error {
 	data := d.Get("data").(string)
 	client := meta.(*api_client)
 
-	key := gjson.Get(data, id)
+	requestID := gjson.Get(data, id)
 
-	if key.String() == "" {
-		return fmt.Errorf(" id not found on data: %s", data)
+	if requestID.String() == "" {
+		return fmt.Errorf(" id not found on response")
 	}
 
-	b, _ := json.Marshal(data)
-	_, err := send(client, "PUT", strings.Replace(client.create_method, "{id}", id, -1), string(b))
+	b, _ := json.Marshal(json.RawMessage(data))
+	_, err := send(client, "PUT", strings.Replace(client.create_method, "{id}", requestID.String(), -1), string(b))
 
 	if err != nil {
 		return fmt.Errorf("Failed to update record: %s", err)
@@ -99,10 +97,8 @@ func resourceScaffoldingUpdate(d *schema.ResourceData, meta interface{}) error {
 
 func resourceScaffoldingDelete(d *schema.ResourceData, meta interface{}) error {
 
-	id := d.Get("id_attribute").(string)
-
+	id := d.Id()
 	client := meta.(*api_client)
-
 	_, err := send(client, "DELETE", strings.Replace(client.read_method, "{id}", id, -1), "")
 
 	if err != nil {
@@ -125,7 +121,6 @@ func send(client *api_client, method string, path string, data string) (string, 
 	} else {
 		req, err = http.NewRequest(method, fulluri, buffer)
 
-		/* Default of application/json, but allow headers array to overwrite later */
 		if err == nil {
 			req.Header.Set("Content-Type", "application/json")
 		}

@@ -14,6 +14,7 @@ func TestAccScaffoldingObject_Basic(t *testing.T) {
 	os.Setenv("REST_API_CREATE_METHOD", "/api/builds/projectA")
 	os.Setenv("REST_API_UPDATE_METHOD", "/api/builds/projectA/{id}")
 	os.Setenv("REST_API_DESTROY_METHOD", "/api/builds/projectA/{id}")
+	os.Setenv("TF_LOG", "1")
 
 	resource.UnitTest(t, resource.TestCase{
 		Providers: testAccProviders,
@@ -21,13 +22,13 @@ func TestAccScaffoldingObject_Basic(t *testing.T) {
 			{
 				Config: testResource,
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr("scaffolding_resource.test", "id", "1234"),
+					resource.TestCheckResourceAttr("scaffolding_resource.test", "id", "some_more_apps"),
 				),
 			},
 			{
 				Config: testResourceUpdate,
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr("scaffolding_resource.test", "id", "1234"),
+					resource.TestCheckResourceAttr("scaffolding_resource.test", "id", "some_more_apps"),
 				),
 			},
 		},
@@ -36,22 +37,28 @@ func TestAccScaffoldingObject_Basic(t *testing.T) {
 
 const testResource = `
 resource "scaffolding_resource" "test" {
-  id_attribute = "id"
+  id_attribute = "applicationName"
   data = jsonencode(
     {
-        "id": "1234",
-		"name" : "john",
-		"age" : 23
+		"project": "projectA",
+        "applicationName" : "some_more_apps",
+        "buildTemplate": "template_11",
+        "pool": "MyPool",
+        "repository" : "App1",
+        "branch" : "master"
     })
 }`
 
 const testResourceUpdate = `
 resource "scaffolding_resource" "test" {
-  id_attribute = "id"
+  id_attribute = "applicationName"
   data = jsonencode(
     {
-        "id": "1234",
-		"name" : "john",
-		"age" : 24
+		"project": "projectA",
+        "applicationName" : "some_more_apps",
+        "buildTemplate": "template_12",
+        "pool": "MyPool",
+        "repository" : "App1",
+        "branch" : "master"
     })
 }`
