@@ -12,7 +12,6 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/structure"
-	"github.com/tidwall/gjson"
 )
 
 func resourceScaffolding() *schema.Resource {
@@ -23,14 +22,33 @@ func resourceScaffolding() *schema.Resource {
 		Delete: resourceScaffoldingDelete,
 
 		Schema: map[string]*schema.Schema{
-			"id_attribute": &schema.Schema{
-				Type:        schema.TypeString,
-				Description: "Allows per-resource override of `id_attribute` ",
-				Required:    true,
-			},
-			"data": {
+			"payload": {
 				Type:     schema.TypeString,
 				Required: true,
+			},
+			"create_method": &schema.Schema{
+				Type:        schema.TypeString,
+				DefaultFunc: schema.EnvDefaultFunc("REST_API_OVERRIDE_CREATE_METHOD", nil),
+				Description: "The HTTP route used to CREATE objects of this type on the API server. Overrides  the provider configuration",
+				Optional:    true,
+			},
+			"read_method": &schema.Schema{
+				Type:        schema.TypeString,
+				Description: "The HTTP route used to READ objects of this type on the API server. Overrides provider configuration",
+				DefaultFunc: schema.EnvDefaultFunc("REST_API_OVERRIDE_READ_METHOD", nil),
+				Optional:    true,
+			},
+			"update_method": &schema.Schema{
+				Type:        schema.TypeString,
+				DefaultFunc: schema.EnvDefaultFunc("REST_API_OVERRIDE_UPDATE_METHOD", nil),
+				Description: "The HTTP route used to UPDATE objects of this type on the API server. Overrides provider configuration",
+				Optional:    true,
+			},
+			"destroy_method": &schema.Schema{
+				Type:        schema.TypeString,
+				DefaultFunc: schema.EnvDefaultFunc("REST_API_OVERRIDE_DESTROY_METHOD", nil),
+				Description: "The HTTP route used to DELETE objects of this type on the API server. Overrides provider configuration",
+				Optional:    true,
 			},
 		},
 	}
@@ -38,77 +56,119 @@ func resourceScaffolding() *schema.Resource {
 
 func resourceScaffoldingCreate(d *schema.ResourceData, meta interface{}) error {
 
-	id := d.Get("id_attribute").(string)
-	data := d.Get("data").(string)
-
 	client := meta.(*api_client)
 
-	requestID := gjson.Get(data, id)
+	payload := d.Get("payload").(string)
+	b, _ := json.Marshal(json.RawMessage(payload))
 
-	if requestID.String() == "" {
-		return fmt.Errorf(" id not found on response")
+	if payload == "" {
+		return fmt.Errorf("Payload cannot be empty")
 	}
 
-	b, _ := json.Marshal(json.RawMessage(data))
-	_, err := send(client, "POST", strings.Replace(client.create_method, "{id}", requestID.String(), -1), string(b))
+	route := d.Get("create_method").(string)
+	if route == "" {
+		route = client.create_method
+	}
+
+	result, err := send(client, "POST", route, string(b))
 
 	if err != nil {
 		return fmt.Errorf("Failed to create record: %s", err)
 	}
 
-	log.Printf("resource create called. Object build:\n%s\n", data)
+	var task Task
+	err = json.Unmarshal(result, &task)
 
-	d.SetId(requestID.String())
+	if err != nil {
+		return fmt.Errorf("Failed to create record: %s", err)
+	}
+
+	if task.Id == "" {
+		return fmt.Errorf("Something went wrong. The api did not return an Id")
+	}
+
+	d.SetId(task.Id)
 	return resourceScaffoldingRead(d, meta)
 }
 
 func resourceScaffoldingRead(d *schema.ResourceData, meta interface{}) error {
 
-	id := d.Id()
 	client := meta.(*api_client)
-	result, err := send(client, "GET", strings.Replace(client.read_method, "{id}", id, -1), "")
+
+	id := d.Id()
+
+	route := d.Get("read_method").(string)
+	if route == "" {
+		route = client.read_method
+	}
+
+	result, err := send(client, "GET", strings.Replace(route, "{id}", id, -1), "")
 
 	if err != nil {
 
-		if strings.Contains(err.Error(), "not found") {
+		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "404") {
 			log.Printf("resource read called. No id found:\n%s\n", id)
 			d.SetId("")
 			return nil
 		}
 
 		return fmt.Errorf(
-			"There was a problem when trying to find object with ID: %s",
-			d.Id())
+			"There was a problem when trying to find object with ID: %s", d.Id())
 	}
 
-	log.Printf("resource read called. Object built:\n%s\n", result)
+	var task Task
+	err = json.Unmarshal(result, &task)
 
-	norm, _ := structure.NormalizeJsonString(result)
+	if err != nil {
+		return fmt.Errorf("Failed to read record: %s", err)
+	}
 
-	d.Set("data", norm)
+	if task.Id == "" {
+		return fmt.Errorf("Something went wrong. The api did not return an Id")
+	}
+
+	if string(task.Payload) == "" {
+		return fmt.Errorf("Something went wrong. The api did not return a Payload")
+	}
+
+	norm, _ := structure.NormalizeJsonString(string(task.Payload))
+	d.Set("payload", norm)
 
 	return nil
 }
 
 func resourceScaffoldingUpdate(d *schema.ResourceData, meta interface{}) error {
 
-	id := d.Get("id_attribute").(string)
-	data := d.Get("data").(string)
 	client := meta.(*api_client)
-	requestID := gjson.Get(data, id)
 
-	if requestID.String() == "" {
-		return fmt.Errorf(" id not found on response")
+	id := d.Id()
+	payload := d.Get("payload").(string)
+	b, _ := json.Marshal(json.RawMessage(payload))
+
+	if payload == "" {
+		return fmt.Errorf("Payload cannot be empty")
 	}
 
-	log.Printf("resource updated called. Object built:\n%s\n", data)
+	route := d.Get("update_method").(string)
+	if route == "" {
+		route = client.update_method
+	}
 
-	b, _ := json.Marshal(json.RawMessage(data))
-
-	_, err := send(client, "PUT", strings.Replace(client.update_method, "{id}", requestID.String(), -1), string(b))
+	result, err := send(client, "PUT", strings.Replace(route, "{id}", id, -1), string(b))
 
 	if err != nil {
 		return fmt.Errorf("Failed to update record: %s", err)
+	}
+
+	var task Task
+	err = json.Unmarshal(result, &task)
+
+	if err != nil {
+		return fmt.Errorf("Failed to read record: %s", err)
+	}
+
+	if task.Id == "" {
+		return fmt.Errorf("Something went wrong. The api did not return an Id")
 	}
 
 	return resourceScaffoldingRead(d, meta)
@@ -118,7 +178,13 @@ func resourceScaffoldingDelete(d *schema.ResourceData, meta interface{}) error {
 
 	id := d.Id()
 	client := meta.(*api_client)
-	_, err := send(client, "DELETE", strings.Replace(client.destroy_method, "{id}", id, -1), "")
+
+	route := d.Get("destroy_method").(string)
+	if route == "" {
+		route = client.destroy_method
+	}
+
+	_, err := send(client, "DELETE", strings.Replace(route, "{id}", id, -1), "")
 
 	if err != nil {
 		return err
@@ -127,7 +193,7 @@ func resourceScaffoldingDelete(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 
-func send(client *api_client, method string, path string, data string) (string, error) {
+func send(client *api_client, method string, path string, data string) ([]byte, error) {
 
 	fulluri := client.uri + path
 	var req *http.Request
@@ -147,7 +213,7 @@ func send(client *api_client, method string, path string, data string) (string, 
 
 	if err != nil {
 		log.Fatal(err)
-		return "", err
+		return []byte{}, err
 	}
 
 	if client.username != "" && client.password != "" {
@@ -157,17 +223,15 @@ func send(client *api_client, method string, path string, data string) (string, 
 	resp, err := client.http_client.Do(req)
 
 	if err != nil {
-		return "", err
+		return []byte{}, err
 	}
 
-	bodyBytes, err2 := ioutil.ReadAll(resp.Body)
+	body, err2 := ioutil.ReadAll(resp.Body)
 	resp.Body.Close()
 
 	if err2 != nil {
-		return "", err2
+		return []byte{}, err2
 	}
-
-	body := string(bodyBytes)
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return body, errors.New(fmt.Sprintf("Unexpected response code '%d': %s", resp.StatusCode, body))
