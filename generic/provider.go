@@ -76,9 +76,6 @@ func Provider() terraform.ResourceProvider {
 				Description: "Enable cookie jar to persist session.",
 			},
 		},
-		DataSourcesMap: map[string]*schema.Resource{
-			"scaffolding_data_source": dataSourceScaffolding(),
-		},
 		ResourcesMap: map[string]*schema.Resource{
 			"scaffolding_resource": resourceScaffolding(),
 		},
