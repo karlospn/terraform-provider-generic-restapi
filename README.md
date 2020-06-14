@@ -1,8 +1,3 @@
-# Terraform generic API provider
+# Terraform HTTP API provider
 
-These provider is based on the work done by Mastercard:
-https://github.com/Mastercard/terraform-provider-restapi
-
-But it's a more simplified version.
-
-
+These terraform provider allow you to manage an stateful object using an HTTP API
