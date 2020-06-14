@@ -42,25 +42,25 @@ func Provider() terraform.ResourceProvider {
 			"create_method": &schema.Schema{
 				Type:        schema.TypeString,
 				DefaultFunc: schema.EnvDefaultFunc("REST_API_CREATE_METHOD", nil),
-				Description: "Defaults to `POST`. The HTTP method used to CREATE objects of this type on the API server.",
+				Description: "The HTTP route used to CREATE objects of this type on the API server.",
 				Required:    true,
 			},
 			"read_method": &schema.Schema{
 				Type:        schema.TypeString,
-				Description: "Defaults to `GET`. The HTTP method used to READ objects of this type on the API server.",
+				Description: "The HTTP route used to READ objects of this type on the API server.",
 				Required:    true,
 				DefaultFunc: schema.EnvDefaultFunc("REST_API_READ_METHOD", nil),
 			},
 			"update_method": &schema.Schema{
 				Type:        schema.TypeString,
 				DefaultFunc: schema.EnvDefaultFunc("REST_API_UPDATE_METHOD", nil),
-				Description: "Defaults to `PUT`. The HTTP method used to UPDATE objects of this type on the API server.",
+				Description: "The HTTP route used to UPDATE objects of this type on the API server.",
 				Required:    true,
 			},
 			"destroy_method": &schema.Schema{
 				Type:        schema.TypeString,
 				DefaultFunc: schema.EnvDefaultFunc("REST_API_DESTROY_METHOD", nil),
-				Description: "Defaults to `DELETE`. The HTTP method used to DELETE objects of this type on the API server.",
+				Description: "The HTTP route used to DELETE objects of this type on the API server.",
 				Required:    true,
 			},
 			"insecure": &schema.Schema{
@@ -75,9 +75,6 @@ func Provider() terraform.ResourceProvider {
 				DefaultFunc: schema.EnvDefaultFunc("REST_API_USE_COOKIES", nil),
 				Description: "Enable cookie jar to persist session.",
 			},
-		},
-		DataSourcesMap: map[string]*schema.Resource{
-			"scaffolding_data_source": dataSourceScaffolding(),
 		},
 		ResourcesMap: map[string]*schema.Resource{
 			"scaffolding_resource": resourceScaffolding(),
