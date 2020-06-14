@@ -70,7 +70,7 @@ func resourceScaffoldingCreate(d *schema.ResourceData, meta interface{}) error {
 		route = client.create_method
 	}
 
-	result, err := send(client, "POST", route, string(b))
+	result, _, err := send(client, "POST", route, string(b))
 
 	if err != nil {
 		return fmt.Errorf("Failed to create record: %s", err)
@@ -102,12 +102,12 @@ func resourceScaffoldingRead(d *schema.ResourceData, meta interface{}) error {
 		route = client.read_method
 	}
 
-	result, err := send(client, "GET", strings.Replace(route, "{id}", id, -1), "")
+	result, statusCode, err := send(client, "GET", strings.Replace(route, "{id}", id, -1), "")
 
 	if err != nil {
 
-		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "404") {
-			log.Printf("resource read called. No id found:\n%s\n", id)
+		if statusCode == 404 {
+			log.Printf("resource not found with ID:\n%s\n", id)
 			d.SetId("")
 			return nil
 		}
@@ -116,22 +116,16 @@ func resourceScaffoldingRead(d *schema.ResourceData, meta interface{}) error {
 			"There was a problem when trying to find object with ID: %s", d.Id())
 	}
 
-	var task Task
-	err = json.Unmarshal(result, &task)
-
 	if err != nil {
 		return fmt.Errorf("Failed to read record: %s", err)
 	}
 
-	if task.Id == "" {
-		return fmt.Errorf("Something went wrong. The api did not return an Id")
+	norm, err := structure.NormalizeJsonString(string(result))
+
+	if err != nil {
+		return fmt.Errorf("Error trying to normalize result: %s", err)
 	}
 
-	if string(task.Payload) == "" {
-		return fmt.Errorf("Something went wrong. The api did not return a Payload")
-	}
-
-	norm, _ := structure.NormalizeJsonString(string(task.Payload))
 	d.Set("payload", norm)
 
 	return nil
@@ -154,21 +148,10 @@ func resourceScaffoldingUpdate(d *schema.ResourceData, meta interface{}) error {
 		route = client.update_method
 	}
 
-	result, err := send(client, "PUT", strings.Replace(route, "{id}", id, -1), string(b))
+	_, _, err := send(client, "PUT", strings.Replace(route, "{id}", id, -1), string(b))
 
 	if err != nil {
 		return fmt.Errorf("Failed to update record: %s", err)
-	}
-
-	var task Task
-	err = json.Unmarshal(result, &task)
-
-	if err != nil {
-		return fmt.Errorf("Failed to read record: %s", err)
-	}
-
-	if task.Id == "" {
-		return fmt.Errorf("Something went wrong. The api did not return an Id")
 	}
 
 	return resourceScaffoldingRead(d, meta)
@@ -184,7 +167,7 @@ func resourceScaffoldingDelete(d *schema.ResourceData, meta interface{}) error {
 		route = client.destroy_method
 	}
 
-	_, err := send(client, "DELETE", strings.Replace(route, "{id}", id, -1), "")
+	_, _, err := send(client, "DELETE", strings.Replace(route, "{id}", id, -1), "")
 
 	if err != nil {
 		return err
@@ -193,7 +176,7 @@ func resourceScaffoldingDelete(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 
-func send(client *api_client, method string, path string, data string) ([]byte, error) {
+func send(client *api_client, method string, path string, data string) ([]byte, int, error) {
 
 	fulluri := client.uri + path
 	var req *http.Request
@@ -213,7 +196,7 @@ func send(client *api_client, method string, path string, data string) ([]byte, 
 
 	if err != nil {
 		log.Fatal(err)
-		return []byte{}, err
+		return []byte{}, 500, err
 	}
 
 	if client.username != "" && client.password != "" {
@@ -223,20 +206,20 @@ func send(client *api_client, method string, path string, data string) ([]byte, 
 	resp, err := client.http_client.Do(req)
 
 	if err != nil {
-		return []byte{}, err
+		return []byte{}, resp.StatusCode, err
 	}
 
 	body, err2 := ioutil.ReadAll(resp.Body)
 	resp.Body.Close()
 
 	if err2 != nil {
-		return []byte{}, err2
+		return []byte{}, resp.StatusCode, err2
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return body, errors.New(fmt.Sprintf("Unexpected response code '%d': %s", resp.StatusCode, body))
+		return body, resp.StatusCode, errors.New(fmt.Sprintf("Unexpected response code '%d': %s", resp.StatusCode, body))
 	}
 
-	return body, nil
+	return body, resp.StatusCode, nil
 
 }
